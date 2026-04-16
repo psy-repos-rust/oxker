@@ -596,7 +596,7 @@ impl AppData {
     pub fn get_selected_ports(&self) -> Option<(Vec<ContainerPorts>, State)> {
         if let Some(item) = self.get_selected_container() {
             let mut ports = item.ports.clone();
-            ports.sort_by(|a, b| a.private.cmp(&b.private));
+            ports.sort_by_key(|a| a.private);
             return Some((ports, item.state));
         }
         None
@@ -938,7 +938,7 @@ impl AppData {
 
         // Only sort it no containers currently set, as afterwards the order is fixed
         if self.containers.items.is_empty() {
-            all_containers.sort_by(|a, b| a.created.cmp(&b.created));
+            all_containers.sort_by_key(|a| a.created);
         }
 
         if !all_containers.is_empty() && self.containers.state.selected().is_none() {

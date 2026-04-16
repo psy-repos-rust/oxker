@@ -78,8 +78,10 @@ fn generate_lower_title(length: usize, width: usize, offset: ScrollOffset) -> St
 
 /// Generate the Lines, remove lines & chars based on the offset and viewport
 fn gen_lines<'a>(data_as_str: &'a str, offset: &ScrollOffset, rect: &Rect) -> Vec<Line<'a>> {
-    let first_line_index = offset.y.max(0);
-    let first_char_index = offset.x.max(0);
+	    // let first_line_index = offset.y.max(0);
+    // let first_char_index = offset.x.max(0);
+    let first_line_index = offset.y;
+    let first_char_index = offset.x;
     let last_char_index = usize::from(rect.width.saturating_sub(2));
     let take_lines = usize::from(rect.height);
     //todo see if log scrolling does this - What?
