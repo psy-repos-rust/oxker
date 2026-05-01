@@ -1,6 +1,3 @@
-// #![allow(unused)]
-// Zigbuild is stuck on 1.87.0, which means Mac builds won't work when using collapsible ifs
-
 use app_data::AppData;
 use app_error::AppError;
 use bollard::{API_DEFAULT_VERSION, Docker};
