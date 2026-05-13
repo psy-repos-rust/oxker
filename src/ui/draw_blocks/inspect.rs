@@ -149,7 +149,7 @@ mod tests {
     use bollard::models::{
         ContainerConfig, ContainerInspectResponse, ContainerState, ContainerStateStatusEnum,
         DriverData, EndpointSettings, HostConfig, HostConfigLogConfig, MountPoint,
-        MountPointTypeEnum, NetworkSettings, RestartPolicy, RestartPolicyNameEnum,
+        NetworkSettings, RestartPolicy, RestartPolicyNameEnum,
     };
     use crossterm::event::KeyCode;
     use insta::assert_snapshot;
@@ -693,7 +693,7 @@ mod tests {
     size_rw: None,
     size_root_fs: None,
     mounts: Some(vec![MountPoint {
-        typ: Some(MountPointTypeEnum::VOLUME),
+        typ: Some("volume".to_owned()),
         name: Some("93bc4e4c8d3823964b58105a99a7b3a7e02c801d5560338bdaf7589966a1b02d".to_owned()),
         source: Some("/var/lib/docker/volumes/93bc4e4c8d3823964b58105a99a7b3a7e02c801d5560338bdaf7589966a1b02d/_data".to_owned()),
         destination: Some("/var/lib/postgresql/data".to_owned()),

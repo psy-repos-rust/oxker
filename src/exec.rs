@@ -286,7 +286,7 @@ impl ExecMode {
     /// This is the fix for key pressed not being handled correctly on quit
     /// It writes a special message to the stdout, and then listens out for a valid response
     /// afterwhich it's assumes that we're completely done with TTY
-	// TODO eventually use async channels here!
+    // TODO eventually use async channels here!
     fn internal_cleanup(&self) -> Result<(), AppError> {
         match self {
             Self::External(_) => Ok(()),
