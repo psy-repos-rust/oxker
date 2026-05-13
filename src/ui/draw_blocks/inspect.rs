@@ -78,8 +78,10 @@ fn generate_lower_title(length: usize, width: usize, offset: ScrollOffset) -> St
 
 /// Generate the Lines, remove lines & chars based on the offset and viewport
 fn gen_lines<'a>(data_as_str: &'a str, offset: &ScrollOffset, rect: &Rect) -> Vec<Line<'a>> {
-    let first_line_index = offset.y.max(0);
-    let first_char_index = offset.x.max(0);
+    // let first_line_index = offset.y.max(0);
+    // let first_char_index = offset.x.max(0);
+    let first_line_index = offset.y;
+    let first_char_index = offset.x;
     let last_char_index = usize::from(rect.width.saturating_sub(2));
     let take_lines = usize::from(rect.height);
     //todo see if log scrolling does this - What?
@@ -146,8 +148,8 @@ mod tests {
     };
     use bollard::models::{
         ContainerConfig, ContainerInspectResponse, ContainerState, ContainerStateStatusEnum,
-        DriverData, EndpointSettings, HostConfig, HostConfigLogConfig, MountPoint,
-        MountPointTypeEnum, NetworkSettings, RestartPolicy, RestartPolicyNameEnum,
+        DriverData, EndpointSettings, HostConfig, HostConfigLogConfig, MountPoint, NetworkSettings,
+        RestartPolicy, RestartPolicyNameEnum,
     };
     use crossterm::event::KeyCode;
     use insta::assert_snapshot;
@@ -691,7 +693,7 @@ mod tests {
     size_rw: None,
     size_root_fs: None,
     mounts: Some(vec![MountPoint {
-        typ: Some(MountPointTypeEnum::VOLUME),
+        typ: Some("volume".to_owned()),
         name: Some("93bc4e4c8d3823964b58105a99a7b3a7e02c801d5560338bdaf7589966a1b02d".to_owned()),
         source: Some("/var/lib/docker/volumes/93bc4e4c8d3823964b58105a99a7b3a7e02c801d5560338bdaf7589966a1b02d/_data".to_owned()),
         destination: Some("/var/lib/postgresql/data".to_owned()),

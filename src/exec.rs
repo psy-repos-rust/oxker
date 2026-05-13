@@ -43,26 +43,30 @@ mod command {
     pub const IT: &str = "-it";
 }
 
+// STILL BROKEN
 /// Currently known byte output after writing KEYBOARD_PROTO to stdout
-/// valid arm: [91, 63, 54, 49, 59, 54, 59, 55, 59, 50, 50, 59, 50, 51, 59, 50, 52, 59, 50, 56, 59, 51, 50, 59,52, 50] => [?61;6;7;22;23;24;28;32;2
-/// valid x86: [91, 63, 49, 59, 50, 99] => [?1;2c
-/// invalid x86: [91, 63, 49, 59, 48, 99] => [?1;0c
+/// valid arm:    [91, 63, 54, 49, 59, 54, 59, 55, 59, 50, 50, 59, 50, 51, 59, 50, 52, 59, 50, 56, 59, 51, 50, 59,52, 50] => [?61;6;7;22;23;24;28;32;2
+/// valid x86:    [91, 63, 49, 59, 50, 99] => [?1;2c
+/// valid x86_v2: [91, 63, 48, 117, 27, 91, 63, 49, 59, 50, 99] => [?0u ESC[?1;2c
+/// invalid x86:  [91, 63, 49, 59, 48, 99] => [?1;0c
 enum ByteOutput {
     Arm,
-    X86,
+    X86_1,
+    X86_2,
 }
 
 impl ByteOutput {
-    const fn len(&self) -> usize {
+    const fn _len(&self) -> usize {
         match self {
             Self::Arm => 26,
-            Self::X86 => 6,
+            Self::X86_1 => 6,
+            Self::X86_2 => 11,
         }
     }
     const fn last(&self) -> &[u8] {
         match self {
             Self::Arm => &[50],
-            Self::X86 => &[99],
+            Self::X86_1 | Self::X86_2 => &[99],
         }
     }
 }
@@ -70,9 +74,9 @@ impl ByteOutput {
 /// Check the output from tty to see if it matches known sequence.
 /// At the moment we only need to check the length and end digit, as x86 valid and invalid match in these two regards
 fn byte_sequence_valid(bytes: &[u8]) -> bool {
-    [ByteOutput::Arm, ByteOutput::X86]
+    [ByteOutput::Arm, ByteOutput::X86_1, ByteOutput::X86_2]
         .iter()
-        .any(|i| i.len() == bytes.len() && bytes.ends_with(i.last()))
+        .any(|i| bytes.len() == i._len() && bytes.ends_with(i.last()))
 }
 
 /// Check if tty is able to be written to, aka not windows
@@ -122,30 +126,6 @@ impl AsyncTTY {
         }
     }
 }
-
-// impl TryFrom<&Terminal<CrosstermBackend<Stdout>>> for HWU16 {
-// 	type Error = None;
-// 		  fn try_from(terminal: &Terminal<CrosstermBackend<Stdout>>) -> Option<Self> {
-//         terminal.size().map_or(None, |i| {
-//             Some(Self {
-//                 width: i.width,
-//                 height: i.height,
-//             })
-//         })
-// 	}
-
-// }
-
-// impl TerminalSize {
-//     pub fn new(terminal: &Terminal<CrosstermBackend<Stdout>>) -> Option<Self> {
-//         terminal.size().map_or(None, |i| {
-//             Some(Self {
-//                 width: i.width,
-//                 height: i.height,
-//             })
-//         })
-//     }
-// }
 
 #[derive(Debug, Clone)]
 pub enum ExecMode {
@@ -292,7 +272,6 @@ impl ExecMode {
                         while let Ok(x) = tty.rx.recv() {
                             input.write_all(&[x]).await.ok();
                         }
-
                         self.internal_cleanup()?;
                     }
                 }
@@ -307,6 +286,7 @@ impl ExecMode {
     /// This is the fix for key pressed not being handled correctly on quit
     /// It writes a special message to the stdout, and then listens out for a valid response
     /// afterwhich it's assumes that we're completely done with TTY
+    // TODO eventually use async channels here!
     fn internal_cleanup(&self) -> Result<(), AppError> {
         match self {
             Self::External(_) => Ok(()),
@@ -314,21 +294,38 @@ impl ExecMode {
                 let waiting = Arc::new(AtomicBool::new(true));
                 let waiting_thread = Arc::clone(&waiting);
 
+                let tty_ready = Arc::new(AtomicBool::new(false));
+                let tty_ready_thread = Arc::clone(&tty_ready);
+
                 std::thread::spawn(move || {
                     let mut bytes = Vec::with_capacity(26);
                     while waiting_thread.load(std::sync::atomic::Ordering::SeqCst) {
                         let mut buf = [0];
                         if let Ok(mut f) = std::fs::File::open(TTY) {
+                            tty_ready_thread.store(true, std::sync::atomic::Ordering::SeqCst);
+
                             if f.read_exact(&mut buf).is_err() {
                                 waiting_thread.store(false, std::sync::atomic::Ordering::SeqCst);
                             }
+
                             bytes.push(buf[0]);
                             if byte_sequence_valid(&bytes) {
                                 waiting_thread.store(false, std::sync::atomic::Ordering::SeqCst);
                             }
+                        } else {
+                            tty_ready_thread.store(true, std::sync::atomic::Ordering::SeqCst);
+                            waiting_thread.store(false, std::sync::atomic::Ordering::SeqCst);
                         }
                     }
                 });
+
+                let start = std::time::Instant::now();
+                while tty_ready.load(std::sync::atomic::Ordering::SeqCst) {
+                    if start.elapsed().as_millis() > 1500 {
+                        return Err(AppError::Terminal);
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
 
                 let mut stdout = std::io::stdout();
                 stdout.write_all(KEYBOARD_PROTO.as_bytes()).ok();
@@ -336,8 +333,7 @@ impl ExecMode {
 
                 let start = std::time::Instant::now();
                 while waiting.load(std::sync::atomic::Ordering::SeqCst) {
-                    if start.elapsed().as_millis() > 1500 {
-                        waiting.store(false, std::sync::atomic::Ordering::SeqCst);
+                    if start.elapsed().as_millis() > 15_000 {
                         return Err(AppError::Terminal);
                     }
                     std::thread::sleep(std::time::Duration::from_millis(10));
